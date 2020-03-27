@@ -90,8 +90,8 @@ class inverter(rtl,eldo,thesdk):
         else: 
           if self.model=='sv':
               # Verilog simulation options here
-              _=rtl_iofile(self, name='A', dir='in', iotype='sample', ionames=['A']) # IO file for input A
-              _=rtl_iofile(self, name='Z', dir='out', iotype='sample', ionames=['Z'], datatype='int')
+              _=rtl_iofile(self, name='A', dir='in', iotype='sample', ionames=['A'], datatype='sint') # IO file for input A
+              _=rtl_iofile(self, name='Z', dir='out', iotype='sample', ionames=['Z'], datatype='sint')
               self.rtlparameters=dict([ ('g_Rs',self.Rs),]) #Defines the sample rate
               self.run_rtl()
           if self.model=='vhdl':
@@ -140,7 +140,7 @@ class inverter(rtl,eldo,thesdk):
 
         '''
         # Input A is read to verilog simulation after 'initdone' is set to 1 by controller
-        self.iofile_bundle.Members['A']._io_condition='initdone'
+        self.iofile_bundle.Members['A'].verilog_io_condition='initdone'
         # Output is read to verilog simulation when all of the outputs are valid, 
         # and after 'initdone' is set to 1 by controller
         self.iofile_bundle.Members['Z'].verilog_io_condition_append(cond='&& initdone')
@@ -161,12 +161,12 @@ if __name__=="__main__":
     #controller.step_time()
     controller.start_datafeed()
 
-    duts=[inverter() for i in range(4) ]
-    duts[0].model='py'
-    duts[1].model='sv'
-    duts[2].model='vhdl'
-    duts[3].model='eldo'
-    for d in duts: 
+    models=[ 'py', 'sv' ]
+    duts=[]
+    for model in models:
+        d=inverter()
+        duts.append(d) 
+        d.model=model
         d.Rs=rs
         #d.interactive_rtl=True
         #d.interactive_eldo=True
