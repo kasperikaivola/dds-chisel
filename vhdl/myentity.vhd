@@ -1,4 +1,4 @@
--- This is an inverter VHDL model
+-- This is an myentity VHDL model
 -- Initially written by Marko Kosunen
 -- Last modification by Marko Kosunen, marko.kosunen@aalto.fi, 16.01.2020 15:51
 library ieee;
@@ -7,14 +7,14 @@ use ieee.numeric_std.all;
 use std.textio.all;
 
 
-entity inverter is
+entity myentity is
     port( reset : in std_logic;
           A : in  std_logic;
           Z : out std_logic
         );
-end inverter;
+end myentity;
 
-architecture rtl of inverter is
+architecture rtl of myentity is
 begin
     invert:process(A)
     begin

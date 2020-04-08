@@ -1,4 +1,4 @@
-module inverter( input reset,
+module myentity( input reset,
                  input A, 
                  output Z );
 //reset does nothing
