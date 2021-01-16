@@ -17,7 +17,7 @@ cat << EOF > ${THISDIR}/Makefile
 .PHONY: all sim doc clean
 
 #all: chisel sim
-all: sim doc
+all: sim
 
 #sim: chisel
 sim:
