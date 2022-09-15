@@ -8,3 +8,5 @@ doc/build/*
 *.nfs
 *.svn
 *.asv
+simulations/
+states/
