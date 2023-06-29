@@ -28,9 +28,6 @@ from thesdk import *
 import numpy as np
 
 class myentity(thesdk):
-    @property
-    def _classfile(self):
-        return os.path.dirname(os.path.realpath(__file__)) + "/"+__name__
 
     def __init__(self,*arg): 
         self.print_log(type='I', msg='Inititalizing %s' %(__name__)) 
@@ -80,17 +77,25 @@ class myentity(thesdk):
             self.main()
 
 if __name__=="__main__":
+    import argparse
     import matplotlib.pyplot as plt
     from  myentity import *
     from  myentity.controller import controller as myentity_controller
     import pdb
     import math
+    # Implement argument parser
+    parser = argparse.ArgumentParser(description='Parse selectors')
+    parser.add_argument('--show', dest='show', type=bool, nargs='?', const = True, 
+            default=False,help='Show figures on screen')
+    args=parser.parse_args()
+
     length=1024
     rs=100e6
     indata=np.cos(2*math.pi/length*np.arange(length)).reshape(-1,1)
 
     models=[ 'py']
     duts=[]
+    plotters=[]
     for model in models:
         d=myentity()
         duts.append(d) 
@@ -121,5 +126,10 @@ if __name__=="__main__":
         printstr="./inv_%s.eps" %(duts[k].model)
         plt.show(block=False);
         figure.savefig(printstr, format='eps', dpi=300);
-    input()
+    #This is here to keep the images visible
+    #For batch execution, you should comment the following line 
+    if args.show:
+       input()
+    #This is to have exit status for succesfuulexecution
+    sys.exit(0)
 

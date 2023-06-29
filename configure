@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Test changes
 THISDIR=$( cd `dirname $0` && pwd )
 MODULE=$( basename ${THISDIR})
 
@@ -22,7 +23,11 @@ all: sim
 #sim: chisel
 sim:
 	cd ${THISDIR}/${MODULE} && \\
-	${PYL} __init__.py
+	${PYL} __init__.py || (echo "make sim failed $$?"; exit 1)
+
+show:
+	cd ${THISDIR}/${MODULE} && \\
+	${PYL} __init__.py --show || (echo "make sim failed $$?"; exit 1)
 
 #chisel:
 #	cd $THISDIR/chisel && \\
@@ -30,7 +35,7 @@ sim:
 
 doc:
 	cd $THISDIR/doc && \\
-	make html
+	make html || (echo "make sim failed $$?"; exit 1)
 
 clean:
 	#cd ${THISDIR}/chisel && \\

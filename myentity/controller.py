@@ -46,7 +46,7 @@ class controller(rtl):
         # controller
         # These are signals of tb driving several targets
         # Not present in DUT
-        self.connectors=verilog_connector_bundle()
+        self.connectors=rtl_connector_bundle()
 
         if len(arg)>=1:
             parent=arg[0]
@@ -107,7 +107,7 @@ class controller(rtl):
 
         f=self.iofile_bundle.Members['control_write']
         #define connectors controlled by this file in order of the list provided 
-        f.verilog_connectors=self.connectors.list(names=scansigs_write)
+        f.rtl_connectors=self.connectors.list(names=scansigs_write)
         f.set_control_data(init=0) # Initialize to zeros at time 0
 
     #Methods to reset and to start datafeed
