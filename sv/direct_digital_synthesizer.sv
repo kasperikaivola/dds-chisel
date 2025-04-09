@@ -1,4 +1,4 @@
-module myentity( input reset,
+module direct_digital_synthesizer( input reset,
                  input A, 
                  output Z );
 //reset does nothing

@@ -1,9 +1,9 @@
 """
 =========
-My Entity
+direct_digital_synthesizer
 =========
 
-My Entity model template The System Development Kit
+direct_digital_synthesizer model template The System Development Kit
 Used as a template for all TheSyDeKick Entities.
 
 Current docstring documentation style is Numpy
@@ -27,7 +27,7 @@ from thesdk import *
 
 import numpy as np
 
-class myentity(thesdk):
+class direct_digital_synthesizer(thesdk):
 
     def __init__(self,*arg): 
         self.print_log(type='I', msg='Inititalizing %s' %(__name__)) 
@@ -79,8 +79,8 @@ class myentity(thesdk):
 if __name__=="__main__":
     import argparse
     import matplotlib.pyplot as plt
-    from  myentity import *
-    from  myentity.controller import controller as myentity_controller
+    from  direct_digital_synthesizer import *
+    from  direct_digital_synthesizer.controller import controller as direct_digital_synthesizer_controller
     import pdb
     import math
     # Implement argument parser
@@ -97,7 +97,7 @@ if __name__=="__main__":
     duts=[]
     plotters=[]
     for model in models:
-        d=myentity()
+        d=direct_digital_synthesizer()
         duts.append(d) 
         d.model=model
         d.Rs=rs
