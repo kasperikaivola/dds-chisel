@@ -27,7 +27,7 @@ class controller(rtl):
         #_=rtl_iofile(self, name='control_read', dir='out', iotype='event', datatype='int',
         #        ionames=['initdone', 'reset'])        
 
-        self.model='py';             #can be set externally, but is not propagated
+        self.model='rtl';             #can be set externally, but is not propagated
         self.par= False              #By default, no parallel processing
         self.queue= []               #By default, no parallel processing
 
