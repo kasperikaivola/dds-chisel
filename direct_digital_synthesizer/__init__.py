@@ -128,8 +128,7 @@ if __name__=="__main__":
         figure.savefig(printstr, format='eps', dpi=300);
     #This is here to keep the images visible
     #For batch execution, you should comment the following line 
-    if args.show:
-       input()
+    input()
     #This is to have exit status for succesfuulexecution
     sys.exit(0)
 
