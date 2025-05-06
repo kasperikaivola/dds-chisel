@@ -24,10 +24,13 @@ if not (os.path.abspath('../../thesdk') in sys.path):
     sys.path.append(os.path.abspath('../../thesdk'))
 
 from thesdk import *
+from rtl import *
+import plot_format
+plot_format.set_style('isscc')
 
 import numpy as np
 
-class direct_digital_synthesizer(thesdk):
+class direct_digital_synthesizer(rtl,thesdk):
 
     def __init__(self,*arg): 
         self.print_log(type='I', msg='Inititalizing %s' %(__name__)) 
@@ -37,6 +40,7 @@ class direct_digital_synthesizer(thesdk):
         self.IOS.Members['A']=IO()   # Pointer for input data
         self.IOS.Members['Z']= IO()
         self.model='py';             # Can be set externally, but is not propagated
+        self.models=['py','rtl']
         #self.controller = DDS_controller(self)
         self.par= False              # By default, no parallel processing
         self.queue= []               # By default, no parallel processing
@@ -161,7 +165,7 @@ if __name__=="__main__":
     indata = np.full((length,1), tw, dtype=np.uint64)
     print("Indata: "+ str(indata))
 
-    models=['py']
+    models=['py','rtl']
     duts=[]
     plotters=[]
     for model in models:
