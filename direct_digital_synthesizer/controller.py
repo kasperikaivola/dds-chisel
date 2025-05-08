@@ -1,5 +1,6 @@
 # Written by Marko kosunen, Marko.kosunen@aalto.fi 20190530
 # The right way to do the unit controls is to write a controller class here
+# direct_digital_synthesizer
 import os
 
 import numpy as np
@@ -28,14 +29,14 @@ class controller(rtl):
         #_=rtl_iofile(self, name='control_read', dir='out', iotype='event', datatype='int',
         #        ionames=['initdone', 'reset'])        
 
-        self.model='rtl';             #can be set externally, but is not propagated
+        self.model='py';             #can be set externally, but is not propagated
         self.par= False              #By default, no parallel processing
         self.queue= []               #By default, no parallel processing
 
         if len(arg)>=1:
             parent=arg[0]
             self.copy_propval(parent,self.proplist)
-            self.parent =parent;
+            self.parent =parent
 
 
         # We now where the rtl file is. 
@@ -52,10 +53,11 @@ class controller(rtl):
         if len(arg)>=1:
             parent=arg[0]
             self.copy_propval(parent,self.proplist)
-            self.parent =parent;
+            self.parent =parent
 
         #These are signals not in dut
         self.newsigs_write=[
+                 'reset',
                  'initdone',
                 ]
 

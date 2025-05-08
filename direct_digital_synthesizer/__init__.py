@@ -25,6 +25,7 @@ if not (os.path.abspath('../../thesdk') in sys.path):
 
 from thesdk import *
 from rtl import *
+from spice import *
 import plot_format
 plot_format.set_style('isscc')
 
@@ -33,14 +34,16 @@ import numpy as np
 class direct_digital_synthesizer(rtl,thesdk):
 
     def __init__(self,*arg): 
-        self.print_log(type='I', msg='Inititalizing %s' %(__name__)) 
+        self.print_log(type='I', msg='Initializing %s' %(__name__)) 
         self.proplist = [ 'Rs' ];    # Properties that can be propagated from parent
         self.Rs =  100e6;            # Sampling frequency
         self.IOS=Bundle()            # Pointer for input data
-        self.IOS.Members['A']=IO()   # Pointer for input data
-        self.IOS.Members['Z']= IO()
+        self.IOS.Members['io_A']=IO()   # Pointer for input data
+        self.IOS.Members['io_B']= IO()
+        self.IOS.Members['control_write']= IO() 
         self.model='py';             # Can be set externally, but is not propagated
-        self.models=['py','rtl']
+        self.models=['py', 'sv', 'icarus']
+        self.lang = 'sv'
         #self.controller = DDS_controller(self)
         self.par= False              # By default, no parallel processing
         self.queue= []               # By default, no parallel processing
@@ -57,7 +60,7 @@ class direct_digital_synthesizer(rtl,thesdk):
         if len(arg)>=1:
             parent=arg[0]
             self.copy_propval(parent,self.proplist)
-            self.parent =parent;
+            self.parent = parent
 
         self.init()
 
@@ -91,22 +94,22 @@ class direct_digital_synthesizer(rtl,thesdk):
     def main(self):
         '''Guideline. Isolate python processing to main method.
         
-        To isolate the interna processing from IO connection assigments, 
+        To isolate the internal processing from IO connection assigments, 
         The procedure to follow is
         1) Assign input data from input to local variable
         2) Do the processing
         3) Assign local variable to output
 
         '''
-        #inval=self.IOS.Members['A'].Data
+        #inval=self.IOS.Members['io_A'].Data
         #out=-inval
         #if self.par:
         #    self.queue.put(out)
-        #self.IOS.Members['Z'].Data=out
+        #self.IOS.Members['io_B'].Data=out
         
         # DDS
         # 1) take the tuning words as a 1‑D array of unsigned ints
-        tw = self.IOS.Members['A'].Data.flatten().astype(np.uint64)
+        tw = self.IOS.Members['io_A'].Data.flatten().astype(np.uint64)
 
         # 2) cumulative‐sum to simulate a running phase accumulator
         # add the carry‑in from the previous run, then wrap
@@ -122,21 +125,88 @@ class direct_digital_synthesizer(rtl,thesdk):
         samples = self.lut[addrs]    # shape = (num_samples,)
 
         # 6) reshape to a column vector and drive the output IO
-        self.IOS.Members['Z'].Data = samples.reshape(-1, 1)
+        self.IOS.Members['io_B'].Data = samples.reshape(-1, 1)
 
-    def run(self,*arg):
+
+    def run(self,*args):
         '''Guideline: Define model depencies of executions in `run` method.
 
         '''
-        if len(arg)>0:
-            self.par=True      #flag for parallel processing
-            self.queue=arg[0]  #multiprocessing.queue as the first argument
-        if self.model=='py':
-            self.main()
+        """
+        Dispatch between Python ('py') and RTL ('sv','icarus','verilator') models.
+        """
+        
+        # allow passing a data queue for Python mode
+        if args:
+            self.par   = True
+            self.queue = args[0]
+
+        # 1) Python simulation
+        if self.model == 'py':
+            return self.main()
+
+        elif self.model in [ 'sv', 'icarus']:
+            inputlist     = ["io_A"]
+            #output_phase  = [f"io_B_phase_{i}" for i in range(32)]
+            output_ampl   = ["io_B"]
+
+            # tuning word input
+            f1 = rtl_iofile(self, name='io_A', dir='in', iotype='sample',
+                    ionames=inputlist, datatype='uint')
+
+            # phase output
+            #f2 = rtl_iofile(self, name='io_B_phase', dir='out', iotype='sample',
+            #        ionames=output_phase, datatype='int')
+
+             # waveform / amplitude output
+            f3 = rtl_iofile(self, name='io_B', dir='out', iotype='sample',
+                    ionames=output_ampl, datatype='int')
+
+            # sync type depending on HDL
+            if self.lang == 'sv':
+                f1.rtl_io_sync = '@(negedge clock)'
+                #f2.rtl_io_sync = '@(negedge clock)'
+                f3.rtl_io_sync = '@(negedge clock)'
+            elif self.lang == 'vhdl':
+                f1.rtl_io_sync = 'falling_edge(clock)'
+                #f2.rtl_io_sync = 'falling_edge(clock)'
+                f3.rtl_io_sync = 'falling_edge(clock)'
+
+            # RTL parameters to Verilog (if your testbench expects them)
+            self.rtlparameters = dict([
+                    ('g_Rs',       ('real', self.Rs)),
+                    ('g_accWidth', ('int',  self.acc_width)),
+                    ('g_lutBits',  ('int',  self.lut_bits)),
+                    ('g_outWidth', ('int',  self.out_width)),
+            ])
+
+            self.run_rtl()
+
+        # 3) unsupported model
+        else:
+            self.print_log(type='F', msg=f"Model '{self.model}' not supported")
         #elif self.model == 'rtl':
         #    self.controller.reset()
         #    self.controller.start_datafeed()
         #    self.controller.dut.run()
+
+    def define_io_conditions(self):
+        '''This overloads the method called by run_rtl method. It defines the read/write conditions for the files
+
+        '''
+        if self.lang == 'vhdl':
+            # Input A is read to verilog simulation after 'initdone' is set to 1 by controller
+            self.iofile_bundle.Members['io_A'].rtl_io_condition='(initdone=\'1\')'
+            # Output is read to verilog simulation when all of the outputs are valid, 
+            # and after 'initdone' is set to 1 by controller
+            self.iofile_bundle.Members['io_B'].rtl_io_condition_append(cond='and (initdone=\'1\')')
+        if self.lang == 'sv':
+            # Input A is read to verilog simulation after 'initdone' is set to 1 by controller
+            self.iofile_bundle.Members['io_A'].rtl_io_condition='initdone'
+            # Output is read to verilog simulation when all of the outputs are valid, 
+            # and after 'initdone' is set to 1 by controller
+            # causes AttributeError no attribute '_rtl_io_condition'
+            #self.iofile_bundle.Members['io_B'].rtl_io_condition_append(cond='&& initdone')
 
 if __name__=="__main__":
     import argparse
@@ -154,9 +224,18 @@ if __name__=="__main__":
 
     length=1024
     rs=100e6
-    acc_w = 32
+    acc_width = 32
+    lut_bits = 10
+    out_width = 12
+    controller=direct_digital_synthesizer_controller()
+    # Tuning word / accumulator width
+    # DDS parameters:
+    controller.acc_width = acc_width     # bits in the phase accumulator
+    controller.lut_bits  = lut_bits      # log2(# entries in the sine table)
+    controller.out_width = out_width     # output amplitude bits
+    controller.Rs=rs               # Sampling frequency
     # Calculate tuning word for exactly one cycle in `length` steps:
-    tw = int((1 << acc_w) / length)
+    tw = int((1 << controller.acc_width) / length)
     print("Tuning word: "+str(tw))
     
     #indata=np.cos(2*math.pi/length*np.arange(length)).reshape(-1,1)
@@ -165,46 +244,59 @@ if __name__=="__main__":
     indata = np.full((length,1), tw, dtype=np.uint64)
     print("Indata: "+ str(indata))
 
-    models=['py','rtl']
+    controller.reset()
+    controller.step_time()
+    controller.start_datafeed()
+    models=[ 'py', 'icarus']
+    # Enables VHDL testbench
+    #lang='vhdl'
+    lang='sv'
     duts=[]
     plotters=[]
     for model in models:
         d=direct_digital_synthesizer()
         duts.append(d) 
         d.model=model
+        print("Model: ", d.model)
+        d.lang = lang
         d.Rs=rs
-        d.acc_width = acc_w
-        d.lut_bits  = 10
-        d.out_width = 12
-        d.IOS.Members['A'].Data=indata
+        d.acc_width = acc_width
+        d.lut_bits  = lut_bits
+        d.out_width = out_width
+        d.IOS.Members['io_A'].Data=indata
+        # Datafield of control_write IO is a type iofile, 
+        # Method rtl.create_connectors adopts it to be iofile of dut.  
+        d.IOS.Members['control_write']=controller.IOS.Members['control_write']
         d.init()
         d.run()
 
     for k in range(len(duts)):
-        hfont = {'fontname':'Sans'}
+        #hfont = {'fontname':'Sans'}
         #figure,axes=plt.subplots(2,1,sharex=True)
         #x = np.arange(length).reshape(-1,1)
         #axes[0].plot(x,indata)
-        #axes[0].set_ylim(-1.1, 1.1);
-        #axes[0].set_xlim((np.amin(x), np.amax(x)));
-        #axes[0].set_ylabel('Input', **hfont,fontsize=18);
+        #axes[0].set_ylim(-1.1, 1.1)
+        #axes[0].set_xlim((np.amin(x), np.amax(x)))
+        #axes[0].set_ylabel('Input', **hfont,fontsize=18)
         #axes[0].grid(True)
-        #axes[1].plot(x, duts[k].IOS.Members['Z'].Data)
-        #axes[1].set_ylim(-1.1, 1.1);
-        #axes[1].set_xlim((np.amin(x), np.amax(x)));
-        #axes[1].set_ylabel('Output', **hfont,fontsize=18);
-        #axes[1].set_xlabel('Sample (n)', **hfont,fontsize=18);
+        #axes[1].plot(x, duts[k].IOS.Members['io_B'].Data)
+        #axes[1].set_ylim(-1.1, 1.1)
+        #axes[1].set_xlim((np.amin(x), np.amax(x)))
+        #axes[1].set_ylabel('Output', **hfont,fontsize=18)
+        #axes[1].set_xlabel('Sample (n)', **hfont,fontsize=18)
         #axes[1].grid(True)
-        #titlestr = "Myentity model %s" %(duts[k].model) 
-        #plt.suptitle(titlestr,fontsize=20);
-        #plt.grid(True);
+        #titlestr = "direct_digital_synthesizer model %s" %(duts[k].model) 
+        #plt.suptitle(titlestr,fontsize=20)
+        #plt.grid(True)
         #printstr="./inv_%s.eps" %(duts[k].model)
-        #plt.show(block=False);
+        #plt.show(block=False)
 
-        outdata = duts[k].IOS.Members['Z'].Data
-
+        outdata = duts[k].IOS.Members['io_B'].Data
+        outdata = np.reshape(outdata, (-1,))
+        print(type(outdata))
         print("Outdata: " + str(outdata))
         print("Output min/max:", np.min(outdata), np.max(outdata))
+        print(outdata.shape)
         
         # Recompute some internals for visualization
         phases = (np.cumsum(indata, dtype=np.uint64) + d.phase0) & ((1 << d.acc_width) - 1)
@@ -239,7 +331,7 @@ if __name__=="__main__":
         # 1. Input tuning word
         axes[0].plot(indata)
         axes[0].set_ylabel("Tuning Word", **hfont, fontsize=12)
-        axes[0].set_title("DDS Simulation Results", fontsize=14)
+        axes[0].set_title("DDS Simulation Results, Model:"+duts[k].model, fontsize=14)
         axes[0].grid(True)
 
         # 2. DDS output waveform
@@ -264,7 +356,7 @@ if __name__=="__main__":
 
         plt.tight_layout()
         plt.show()
-        figure.savefig(printstr, format='eps', dpi=300);
+        #figure.savefig(printstr, format='eps', dpi=300);
 
     #This is here to keep the images visible
     #For batch execution, you should comment the following line 
