@@ -42,8 +42,9 @@ class direct_digital_synthesizer(rtl,thesdk):
         self.IOS.Members['io_B']= IO()
         self.IOS.Members['control_write']= IO() 
         self.model='py';             # Can be set externally, but is not propagated
-        self.models=['py', 'sv', 'icarus']
+        self.models=['py','icarus']
         self.lang = 'sv'
+        self.shape = 'sine'
         #self.controller = DDS_controller(self)
         self.par= False              # By default, no parallel processing
         self.queue= []               # By default, no parallel processing
@@ -73,7 +74,7 @@ class direct_digital_synthesizer(rtl,thesdk):
         #amp = (2**(self.out_width - 1) - 1)
         #table = np.round(amp * np.sin(angles)).astype(np.int32)
         #self.lut = table
-        self.build_lut('square')
+        self.build_lut(self.shape)
 
     def build_lut(self, waveform='sine'):
         N = 1 << self.lut_bits
@@ -127,6 +128,10 @@ class direct_digital_synthesizer(rtl,thesdk):
         # 6) reshape to a column vector and drive the output IO
         self.IOS.Members['io_B'].Data = samples.reshape(-1, 1)
 
+    # Fix unsigned interpretation issue for signed 12-bit data
+    def unsigned_to_signed(self, x, bits):
+        mask = (1 << bits)
+        return ((x + mask//2) % mask) - mask//2
 
     def run(self,*args):
         '''Guideline: Define model depencies of executions in `run` method.
@@ -149,6 +154,8 @@ class direct_digital_synthesizer(rtl,thesdk):
             inputlist     = ["io_A"]
             #output_phase  = [f"io_B_phase_{i}" for i in range(32)]
             output_ampl   = ["io_B"]
+            #for i in output_ampl:
+            #    output_ampl[i] = self.unsigned_to_signed(output_ampl[i], self.out_width)
 
             # tuning word input
             f1 = rtl_iofile(self, name='io_A', dir='in', iotype='sample',
@@ -247,7 +254,7 @@ if __name__=="__main__":
     controller.reset()
     controller.step_time()
     controller.start_datafeed()
-    models=['icarus']
+    models=['py','icarus']
     # Enables VHDL testbench
     #lang='vhdl'
     lang='sv'
@@ -263,7 +270,7 @@ if __name__=="__main__":
         d.acc_width = acc_width
         d.lut_bits  = lut_bits
         d.out_width = out_width
-        d.interactive_rtl = True
+        d.interactive_rtl = True # Enable interactive RTL simulation (GTKWave)
         d.IOS.Members['io_A'].Data=indata
         # Datafield of control_write IO is a type iofile, 
         # Method rtl.create_connectors adopts it to be iofile of dut.  
@@ -294,6 +301,7 @@ if __name__=="__main__":
 
         outdata = duts[k].IOS.Members['io_B'].Data
         outdata = np.reshape(outdata, (-1,))
+        outdata = duts[k].unsigned_to_signed(outdata.astype(np.int32), duts[k].out_width)
         print(type(outdata))
         print("Outdata: " + str(outdata))
         print("Output min/max:", np.min(outdata), np.max(outdata))
