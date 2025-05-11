@@ -247,7 +247,7 @@ if __name__=="__main__":
     controller.reset()
     controller.step_time()
     controller.start_datafeed()
-    models=[ 'py', 'icarus']
+    models=['icarus']
     # Enables VHDL testbench
     #lang='vhdl'
     lang='sv'
@@ -263,6 +263,7 @@ if __name__=="__main__":
         d.acc_width = acc_width
         d.lut_bits  = lut_bits
         d.out_width = out_width
+        d.interactive_rtl = True
         d.IOS.Members['io_A'].Data=indata
         # Datafield of control_write IO is a type iofile, 
         # Method rtl.create_connectors adopts it to be iofile of dut.  
