@@ -3,3 +3,5 @@
 ;; then enter the text in that file's own buffer.
 
 \#*#
+simulations
+!chisel_files
