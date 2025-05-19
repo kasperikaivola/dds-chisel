@@ -44,7 +44,7 @@ class direct_digital_synthesizer(rtl,thesdk):
         self.model='py';             # Can be set externally, but is not propagated
         self.models=['py','icarus']
         self.lang = 'sv'
-        self.shape = 'sine'
+        self.shape = 'triangle'
         #self.controller = DDS_controller(self)
         self.par= False              # By default, no parallel processing
         self.queue= []               # By default, no parallel processing
@@ -52,7 +52,8 @@ class direct_digital_synthesizer(rtl,thesdk):
         # DDS parameters:
         self.acc_width = 32      # bits in the phase accumulator
         self.lut_bits  = 10      # log2(# entries in the sine table)
-        self.out_width = 12      # output amplitude bits
+        self.out_width = 12      # output amplitude bits      
+        self.n = 10              # Number of periods
 
         # state
         self.phase0 = 0          # initial phase word
@@ -108,24 +109,24 @@ class direct_digital_synthesizer(rtl,thesdk):
         #    self.queue.put(out)
         #self.IOS.Members['io_B'].Data=out
         
-        # DDS
-        # 1) take the tuning words as a 1‑D array of unsigned ints
+        #DDS
+        # take the tuning words as a 1‑D array of unsigned ints
         tw = self.IOS.Members['io_A'].Data.flatten().astype(np.uint64)
 
-        # 2) cumulative‐sum to simulate a running phase accumulator
-        # add the carry‑in from the previous run, then wrap
+        # cumulative‐sum to simulate a running phase accumulator
+        # carry‑in from previous run
         phases = (np.cumsum(tw, dtype=np.uint64) + self.phase0) & ((1 << self.acc_width) - 1)
 
-        # 3) save the last phase for next invocation (if you re‑call main)
+        # save last phase for next invocation
         self.phase0 = int(phases[-1])
 
-        # 4) drop the top bits to index the LUT
+        # drop top bits to index the LUT
         addrs = phases >> (self.acc_width - self.lut_bits)
 
-        # 5) look up the sine value
+        # look up the sine value
         samples = self.lut[addrs]    # shape = (num_samples,)
 
-        # 6) reshape to a column vector and drive the output IO
+        # reshape to a column vector and io out
         self.IOS.Members['io_B'].Data = samples.reshape(-1, 1)
 
     # Fix unsigned interpretation issue for signed 12-bit data
@@ -234,6 +235,8 @@ if __name__=="__main__":
     acc_width = 32
     lut_bits = 10
     out_width = 12
+    # number of periods
+    n = 10
     controller=direct_digital_synthesizer_controller()
     # Tuning word / accumulator width
     # DDS parameters:
@@ -241,8 +244,8 @@ if __name__=="__main__":
     controller.lut_bits  = lut_bits      # log2(# entries in the sine table)
     controller.out_width = out_width     # output amplitude bits
     controller.Rs=rs               # Sampling frequency
-    # Calculate tuning word for exactly one cycle in `length` steps:
-    tw = int((1 << controller.acc_width) / numSamples)
+    # Calculate tuning word for n cycles in `length` steps:
+    tw = int((n << controller.acc_width) / numSamples)
     print("Tuning word: "+str(tw))
     
     #indata=np.cos(2*math.pi/length*np.arange(length)).reshape(-1,1)
@@ -296,7 +299,7 @@ if __name__=="__main__":
         #titlestr = "direct_digital_synthesizer model %s" %(duts[k].model) 
         #plt.suptitle(titlestr,fontsize=20)
         #plt.grid(True)
-        #printstr="./inv_%s.eps" %(duts[k].model)
+        printstr="./DDS_%s.jpg" %(duts[k].model)
         #plt.show(block=False)
 
         outdata = duts[k].IOS.Members['io_B'].Data
@@ -329,7 +332,7 @@ if __name__=="__main__":
             Y_db = 20 * np.log10(Y / Y_max + 1e-12)  # +eps avoids log(0)
 
         # Estimated output freq
-        fout = (d.Rs * int(indata[0])) / (1 << d.acc_width)
+        fout = (d.Rs * int(indata[0].item())) / (1 << d.acc_width)
         #fout = list(map(lambda fout :str(fout) + '%',fout.round(2)))
         print(f"Output frequency: {fout/1e6:.3f} MHz")
 
@@ -345,9 +348,13 @@ if __name__=="__main__":
 
         # 2. DDS output waveform
         axes[1].plot(outdata, label='DDS Output')
-        # Optional: overlay ideal sine wave
-        expected = (2**(d.out_width - 1) - 1) * np.sin(2 * np.pi * np.arange(len(outdata)) / len(outdata))
-        axes[1].plot(expected, '--', label='Ideal Sine', alpha=0.6)
+        # overlay ideal sine wave
+        expected = (2**(d.out_width - 1) - 1) * np.sin(2 * d.n * np.pi * np.arange(len(outdata)) / len(outdata))
+        #
+        amp = (2**(d.out_width - 1) - 1)
+        #expected = np.sign(np.sin(2 * d.n * np.pi * np.arange(len(outdata)) / len(outdata)))
+        expected = amp * (2 / np.pi) * np.arcsin(np.sin(2 * d.n * np.pi * np.arange(len(outdata)) / len(outdata)))
+        axes[1].plot(expected, '--', label='Ideal Triangle Wave', alpha=0.6)
         axes[1].set_ylabel("Amplitude", **hfont, fontsize=12)
         axes[1].legend()
         axes[1].grid(True)
@@ -365,7 +372,7 @@ if __name__=="__main__":
 
         plt.tight_layout()
         plt.show()
-        #figure.savefig(printstr, format='eps', dpi=300);
+        figure.savefig(printstr, format='jpg', dpi=300)
 
     #This is here to keep the images visible
     #For batch execution, you should comment the following line 
