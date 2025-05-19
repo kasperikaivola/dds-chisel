@@ -1,0 +1,1 @@
+/home/kkaivola/ICDesignProd/thesdk_template/Entities/direct_digital_synthesizer/sv/../chisel/verilog/direct_digital_synthesizer.v

@@ -229,7 +229,7 @@ if __name__=="__main__":
             default=False,help='Show figures on screen')
     args=parser.parse_args()
 
-    length=1024
+    numSamples=1024
     rs=100e6
     acc_width = 32
     lut_bits = 10
@@ -242,13 +242,13 @@ if __name__=="__main__":
     controller.out_width = out_width     # output amplitude bits
     controller.Rs=rs               # Sampling frequency
     # Calculate tuning word for exactly one cycle in `length` steps:
-    tw = int((1 << controller.acc_width) / length)
+    tw = int((1 << controller.acc_width) / numSamples)
     print("Tuning word: "+str(tw))
     
     #indata=np.cos(2*math.pi/length*np.arange(length)).reshape(-1,1)
 
     # Build a column vector of that constant tuning word:
-    indata = np.full((length,1), tw, dtype=np.uint64)
+    indata = np.full((numSamples,1), tw, dtype=np.uint64)
     print("Indata: "+ str(indata))
 
     controller.reset()

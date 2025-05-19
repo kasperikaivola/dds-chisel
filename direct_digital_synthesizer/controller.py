@@ -121,7 +121,7 @@ class controller(rtl):
             f.set_control_data(time=self.time,name=name,val=value)
 
         # After awhile, switch off reset 
-        self.step_time(step=15*self.step)
+        self.step_time(step=1*self.step)
 
         for name in [ 'reset', ]:
             f.set_control_data(time=self.time,name=name,val=0)
